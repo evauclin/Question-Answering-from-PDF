@@ -40,8 +40,8 @@ Description de l'architecture du système...
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/yourusername/yourrepository.git
-   cd yourrepository
+   git clone https://github.com/evauclin/Question-Answering-from-PDF.git
+   cd Question-Answering-from-PDF
     ```
    
 2. **Create a Virtual Environment and Install Dependencies**
@@ -65,4 +65,3 @@ Description de l'architecture du système...
 - **Ask a Question**: After uploading a PDF, you can ask questions about the content. The system will retrieve relevant chunks and generate answers.
 - **View Conversation History**: The conversation history panel displays the questions asked and the corresponding answers.
 - **Reset the System**: Use the reset button to clear the conversation history and reset the vector database.
-
