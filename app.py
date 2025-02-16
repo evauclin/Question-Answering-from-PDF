@@ -2,83 +2,97 @@ import streamlit as st
 import os
 import tempfile
 from pathlib import Path
-from query_data import query_rag
-from populate_database import (
-    load_documents,
-    split_documents,
-    add_to_chroma,
-    clear_database,
-)
+import logging
+
+from query_data import query_rag  # Ensure that query_data.py defines query_rag
+from populate_database import load_pdf_documents, split_pdf_documents, update_chroma_database, clear_database
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.schema.document import Document
 
+# Configure logging for debugging purposes
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 st.set_page_config(page_title="PDF Question-Answering System", layout="wide")
 
-# Initialize session state
+# Initialize session state variables
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
-if "db_initialized" not in st.session_state:
-    st.session_state.db_initialized = False
+if "database_initialized" not in st.session_state:
+    st.session_state.database_initialized = False
 
 st.title("📚 PDF Question-Answering System")
 
 
-def process_uploaded_file(uploaded_file):
-    """Process uploaded PDF file using existing functions"""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        # Save uploaded file to temp directory
-        temp_path = Path(temp_dir) / uploaded_file.name
-        with open(temp_path, "wb") as f:
-            f.write(uploaded_file.getvalue())
+def process_pdf_upload(pdf_file) -> None:
+    """
+    Processes the uploaded PDF file: saves it temporarily, loads its documents,
+    splits the content into chunks, and adds them to the vector database.
 
-        # Use your existing document loader
-        loader = PyPDFDirectoryLoader(temp_dir)
-        documents = loader.load()
+    :param pdf_file: The PDF file uploaded by the user.
+    """
+    try:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Save the uploaded PDF to a temporary directory
+            temp_pdf_path = Path(temp_dir) / pdf_file.name
+            with open(temp_pdf_path, "wb") as temp_file:
+                temp_file.write(pdf_file.getvalue())
 
-        # Process documents using your existing functions
-        chunks = split_documents(documents)
-        add_to_chroma(chunks)
+            # Load PDF documents from the temporary directory
+            pdf_loader = PyPDFDirectoryLoader(temp_dir)
+            pdf_documents = pdf_loader.load()
+
+            # Split documents into chunks and update the vector database
+            document_chunks = split_pdf_documents(pdf_documents)
+            update_chroma_database(document_chunks)
+            logging.info("PDF file processed and added to the database.")
+    except Exception as error:
+        logging.error("Error processing PDF file: %s", error)
+        st.error("An error occurred while processing the PDF file.")
 
 
-# File upload
-uploaded_file = st.file_uploader("Upload your PDF file", type=["pdf"])
+# File uploader
+uploaded_pdf = st.file_uploader("Upload your PDF file", type=["pdf"])
 
-if uploaded_file:
-    if not st.session_state.db_initialized:
+if uploaded_pdf:
+    if not st.session_state.database_initialized:
         with st.spinner("Processing PDF file..."):
-            clear_database()  # Clear existing database
-            process_uploaded_file(uploaded_file)
-            st.session_state.db_initialized = True
+            clear_database()  # Reset the existing database
+            process_pdf_upload(uploaded_pdf)
+            st.session_state.database_initialized = True
         st.success("PDF processed successfully! You can now ask questions.")
 
-    # Question input
-    question = st.text_input("Ask a question about your document:")
-    if question:
+    # User question input
+    user_question = st.text_input("Ask a question about your document:")
+    if user_question:
         with st.spinner("Finding answer..."):
-            response = query_rag(question)
-            st.session_state.conversation_history.append(
-                {"question": question, "answer": response}
-            )
+            try:
+                answer = query_rag(user_question)
+            except Exception as error:
+                logging.error("Error fetching answer: %s", error)
+                answer = "An error occurred while fetching the answer."
+            st.session_state.conversation_history.append({
+                "question": user_question,
+                "answer": answer
+            })
 
     # Display conversation history
     if st.session_state.conversation_history:
         st.markdown("### Conversation History")
-        for item in st.session_state.conversation_history:
-            st.markdown(f"**Question:** {item['question']}")
-            st.markdown(f"**Answer:** {item['answer']}")
+        for entry in st.session_state.conversation_history:
+            st.markdown(f"**Question:** {entry['question']}")
+            st.markdown(f"**Answer:** {entry['answer']}")
             st.markdown("---")
 
-    # Reset button
+    # Button to reset conversation
     if st.button("Reset Conversation"):
         st.session_state.conversation_history = []
-        st.session_state.db_initialized = False
+        st.session_state.database_initialized = False
         clear_database()
         st.experimental_rerun()
-
 else:
     st.info("👆 Start by uploading a PDF file.")
 
-# Instructions in sidebar
+# Sidebar instructions
 with st.sidebar:
     st.markdown("""
     ### How to use this app:
