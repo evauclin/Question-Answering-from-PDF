@@ -7,7 +7,7 @@ import logging
 from query_data import query_rag  # Ensure that query_data.py defines query_rag
 from populate_database import load_pdf_documents, split_pdf_documents, update_chroma_database, clear_database
 from langchain_community.document_loaders import PyPDFDirectoryLoader
-from langchain.schema.document import Document
+from langchain_core.documents import Document
 
 # Configure logging for debugging purposes
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
